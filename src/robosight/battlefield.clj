@@ -2,7 +2,8 @@
   (:require   (clojure.core [async :as async :refer [>!! <!! >! <!]])
               (clojure.java [io    :as io])
               (robosight    [core  :as robosight]))
-  (:import    (java.io PrintWriter))
+  (:import    (java.io              PrintWriter)
+              (java.util.concurrent TimeUnit))
   (:gen-class :name com.tail_island.robosight.Battlefield
               :main true))
 
@@ -15,17 +16,31 @@
         outs      (doall (map #(io/reader               (.getInputStream  %))  processes))
         errs      (doall (map #(io/reader               (.getErrorStream  %))  processes))
         tick      (robosight/tick-fn ins outs)]
-    (doseq [err errs]
-      (async/go
-        (while true
-          (binding [*out* *err*]
-            (println (.readLine err))))))
     (try
+      (doseq [err errs]
+        (binding [*out* *err*]
+          (async/go-loop []
+            (when-let [s (.readLine err)]
+              (println s)
+              (recur)))))
       ((fn [objects]
          (println (pr-str objects))
          (if-not (some #(every? robosight/broken? (second %)) (group-by robosight/team (filter robosight/team objects)))
            (recur (tick objects))))
        robosight/initial-objects)
+
+      (catch java.util.concurrent.TimeoutException ex
+        (.printStackTrace ex)
+        (doseq [process processes]
+          (.waitFor process 1 TimeUnit/SECONDS)
+          (when (.isAlive process)
+            (.destroy process))))
+      
       (finally
-        (doseq [closeable (flatten [ins outs])]
-          (.close closeable))))))
+        (doseq [closeable (concat ins outs errs)]
+          (.close closeable))
+        (doseq [process processes]
+          (.waitFor process 1 TimeUnit/SECONDS)
+          (when (.isAlive process)
+            (.destroy process)))
+        (shutdown-agents)))))

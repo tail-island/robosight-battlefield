@@ -2,10 +2,17 @@
   (:require   (clojure.core [async :as async :refer [>!! <!! >! <!]])
               (clojure.java [io    :as io])
               (robosight    [core  :as robosight]))
-  (:import    (java.io              PrintWriter)
+  (:import    (clojure.lang         ExceptionInfo)
+              (java.io              PrintWriter)
               (java.util.concurrent TimeUnit))
   (:gen-class :name com.tail_island.robosight.Battlefield
               :main true))
+
+(defn- print-winner
+  [winner]
+  (println (pr-str (if winner
+                     (format "%s team win!" (["Left" "Right"] winner))
+                     "No game"))))
 
 (defn -main
   [& args]
@@ -25,22 +32,22 @@
               (recur)))))
       ((fn [objects]
          (println (pr-str objects))
-         (if-not (some #(every? robosight/broken? (second %)) (group-by robosight/team (filter robosight/team objects)))
+         (if (robosight/game-finished? objects)
+           (print-winner (robosight/winner objects))
            (recur (tick objects))))
        robosight/initial-objects)
 
-      (catch java.util.concurrent.TimeoutException ex
-        (.printStackTrace ex)
+      (catch clojure.lang.ExceptionInfo ex
+        (case (:reason (ex-data ex))
+          :timeout (print-winner (Math/abs (- (:timeout-team (ex-data ex)) 1))))
         (doseq [process processes]
-          (.waitFor process 1 TimeUnit/SECONDS)
-          (when (.isAlive process)
-            (.destroy process))))
-      
+          (.destroy process)))
+
       (finally
         (doseq [closeable (concat ins outs errs)]
           (.close closeable))
         (doseq [process processes]
-          (.waitFor process 1 TimeUnit/SECONDS)
+          (.waitFor process 1000 TimeUnit/MILLISECONDS)
           (when (.isAlive process)
             (.destroy process)))
         (shutdown-agents)))))

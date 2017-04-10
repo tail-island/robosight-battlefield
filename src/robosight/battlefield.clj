@@ -12,7 +12,7 @@
   [winner]
   (println (pr-str (if winner
                      (format "%s team win!" (["Left" "Right"] winner))
-                     "No game"))))
+                     "No game.."))))
 
 (defn -main
   [& args]
@@ -30,16 +30,17 @@
             (when-let [s (.readLine err)]
               (println s)
               (recur)))))
-      ((fn [objects]
-         (println (pr-str objects))
-         (if (robosight/game-finished? objects)
-           (print-winner (robosight/winner objects))
-           (recur (tick objects))))
-       robosight/initial-objects)
+      ((fn [state]
+         (println (pr-str state))
+         (if (robosight/game-finished? state)
+           (print-winner (robosight/winner state))
+           (recur (tick state))))
+       robosight/initial-state)
 
       (catch clojure.lang.ExceptionInfo ex
         (case (:reason (ex-data ex))
-          :timeout (print-winner (Math/abs (- (:timeout-team (ex-data ex)) 1))))
+          :timeout (print-winner (Math/abs (- (:timeout-team (ex-data ex)) 1)))
+          (.printStackTrace ex))
         (doseq [process processes]
           (.destroy process)))
 

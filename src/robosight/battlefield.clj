@@ -49,6 +49,5 @@
           (.close closeable))
         (doseq [process processes]
           (.waitFor process 1000 TimeUnit/MILLISECONDS)
-          (when (.isAlive process)
-            (.destroy process)))
+          (.destroy process))
         (shutdown-agents)))))

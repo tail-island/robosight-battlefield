@@ -19,9 +19,9 @@
   (let [processes (doall (map (fn [[cmd dir]]
                                 (.exec (Runtime/getRuntime) cmd nil (io/as-file dir)))
                               (partition 2 args)))
-        ins       (doall (map #(PrintWriter. (io/writer (.getOutputStream %))) processes))
-        outs      (doall (map #(io/reader               (.getInputStream  %))  processes))
-        errs      (doall (map #(io/reader               (.getErrorStream  %))  processes))
+        ins       (doall (map #(PrintWriter. (io/writer (.getOutputStream %) :encoding (System/getProperty "file.encoding"))) processes))
+        outs      (doall (map #(io/reader               (.getInputStream  %) :encoding (System/getProperty "file.encoding"))  processes))
+        errs      (doall (map #(io/reader               (.getErrorStream  %) :encoding (System/getProperty "file.encoding"))  processes))
         tick      (robosight/tick-fn ins outs)]
     (try
       (doseq [err errs]
